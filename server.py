@@ -9,8 +9,8 @@ app = Flask(__name__)
 MODEL_PATH = 'bert_classifier.tflite'
 
 if not os.path.exists(MODEL_PATH):
-    print(f"❌ 錯誤: 找不到 {MODEL_PATH}")
-    print("請確保下載了 bert_classifier.tflite 並放在與此程式同一目錄下。")
+    print(f"error:not found {MODEL_PATH}")
+    print("請確保bert_classifier.tflite在同一目錄下")
     exit(1)
 
 
@@ -24,7 +24,7 @@ options = text.TextClassifierOptions(
 def analyze_sentiment():
     try:
         data = request.json
-        print(f"收到手機傳來的資料: {data}")
+        print(f"Request data: {data}")
         
         user_text = data.get('text', '')
         
@@ -51,7 +51,7 @@ def analyze_sentiment():
             score = -confidence_score  # 如果是負面變成負數
         
         print(f"分析結果 -> 文字: {user_text}")
-        print(f"模型判斷: {sentiment_label}, 信心分數: {confidence_score:.4f}")
+        print(f"sentiment: {sentiment_label}, score: {confidence_score:.4f}")
 
         response = {
             "status": "success",
