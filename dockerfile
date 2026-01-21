@@ -1,6 +1,5 @@
 FROM python:3.10-slim
 
-# 設定工作目錄
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y \
