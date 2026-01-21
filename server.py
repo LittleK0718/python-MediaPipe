@@ -1,41 +1,62 @@
+import os
 from flask import Flask, request, jsonify
-from textblob import TextBlob
+import mediapipe as mp
+from mediapipe.tasks import python
+from mediapipe.tasks.python import text
 
 app = Flask(__name__)
 
-# 設定 API 路徑
+MODEL_PATH = 'bert_classifier.tflite'
+
+if not os.path.exists(MODEL_PATH):
+    print(f"❌ 錯誤: 找不到 {MODEL_PATH}")
+    print("請確保下載了 bert_classifier.tflite 並放在與此程式同一目錄下。")
+    exit(1)
+
+
+base_options = python.BaseOptions(model_asset_path=MODEL_PATH)
+options = text.TextClassifierOptions(
+    base_options=base_options,
+    max_results=1  # 只回傳數值最高的
+)
+
 @app.route('/analyze_sentiment', methods=['POST'])
 def analyze_sentiment():
     try:
-        # 1. 接收手機傳來的 JSON 資料
         data = request.json
         print(f"收到手機傳來的資料: {data}")
         
         user_text = data.get('text', '')
         
-        # 如果沒收到文字，回傳錯誤
         if not user_text:
             return jsonify({"status": "error", "message": "No text provided"}), 400
 
-        # 2. 進行情緒分析 (使用 TextBlob - 救急用！)
-        # Polarity (極性): -1.0 (非常負面) 到 1.0 (非常正面)
-        blob = TextBlob(user_text)
-        score = blob.sentiment.polarity
+        print("正在使用 BERT 模型分析...")
         
-        # 簡單判定情緒類別 (這裡的閥值 0.1 可以自己調整)
-        sentiment_label = "neutral"
-        if score > 0.1:
-            sentiment_label = "positive"
-        elif score < -0.1:
-            sentiment_label = "negative"
+        with text.TextClassifier.create_from_options(options) as classifier:
+            classification_result = classifier.classify(user_text)
 
-        print(f"分析結果 -> 文字: {user_text}, 分數: {score}, 類別: {sentiment_label}")
+        
+            if classification_result.classifications:
+                top_category = classification_result.classifications[0].categories[0]
+                sentiment_label = top_category.category_name # "positive" 或 "negative"
+                confidence_score = top_category.score        # 範圍 0.0 ~ 1.0
+            else:
+                sentiment_label = "unknown"
+                confidence_score = 0.0
 
-        # 3. 回傳 JSON 給手機 (格式跟 MediaPipe 一模一樣，騙過手機)
+        #這要不要看你 就是轉成負號
+        score = confidence_score
+        if sentiment_label == "negative":
+            score = -confidence_score  # 如果是負面變成負數
+        
+        print(f"分析結果 -> 文字: {user_text}")
+        print(f"模型判斷: {sentiment_label}, 信心分數: {confidence_score:.4f}")
+
         response = {
             "status": "success",
-            "score": score,               # 數值 (-1 ~ 1)
-            "sentiment": sentiment_label, # 文字 (positive/negative)
+            "score": score,      # 轉換後的數值-1~1
+            "sentiment": sentiment_label,   # "positive" 或 "negative"
             "original_text": user_text
         }
         return jsonify(response)
@@ -45,8 +66,8 @@ def analyze_sentiment():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
-    # host='0.0.0.0' 代表允許區網內的手機連線
-    # port=5000 是連接埠
-    print("Server 啟動中... (TextBlob 救急版)")
-    print("請確保手機跟電腦連同一個 WiFi")
+    print("🚀 Server 啟動中... (MediaPipe BERT 版)")
+    print(f"📦 模型來源: {MODEL_PATH}")
+    print("📡 請確保手機跟電腦連同一個 WiFi")
+    
     app.run(host='0.0.0.0', port=5000)
